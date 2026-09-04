@@ -1,5 +1,5 @@
 #!/bin/bash
-# Upgrade a Docker CE v27.x
+# Upgrade a Docker CE v27.x de forma dinámica según la versión de Ubuntu
 
 # 1. Desinstalar versión vieja
 apt-get remove -y docker docker-engine docker.io containerd runc docker-compose
@@ -13,16 +13,28 @@ install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 
+# Detectar el nombre en clave de Ubuntu (ej. jammy, noble)
+UBUNTU_CODENAME=$(lsb_release -cs)
+
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
   https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  $UBUNTU_CODENAME stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# 4. Instalar Docker CE v27.x fijado
+# 4. Instalar Docker CE v27.x fijado (Detectando versión de Ubuntu dinámicamente)
 apt-get update
+
+# Detectar la versión numérica de Ubuntu (ej. 22.04, 24.04)
+UBUNTU_VERSION=$(lsb_release -rs)
+
+# Construir el string de la versión del paquete
+DOCKER_VERSION="5:27.5.1-1~ubuntu.${UBUNTU_VERSION}~${UBUNTU_CODENAME}"
+
+echo "Instalando Docker versión: $DOCKER_VERSION"
+
 apt-get install -y \
-  docker-ce=5:27.5.1-1~ubuntu.22.04~jammy \
-  docker-ce-cli=5:27.5.1-1~ubuntu.22.04~jammy \
+  docker-ce=$DOCKER_VERSION \
+  docker-ce-cli=$DOCKER_VERSION \
   containerd.io \
   docker-compose-plugin
 
