@@ -1,7 +1,8 @@
 #!/bin/bash
 # Upgrade a Docker CE v27.x de forma dinámica según la versión de Ubuntu
 
-# 1. Desinstalar versión vieja
+# 1. Liberar paquetes retenidos (por si falló antes) y desinstalar versión vieja
+apt-mark unhold docker-ce docker-ce-cli
 apt-get remove -y docker docker-engine docker.io containerd runc docker-compose
 
 # 2. Dependencias
@@ -32,7 +33,7 @@ DOCKER_VERSION="5:27.5.1-1~ubuntu.${UBUNTU_VERSION}~${UBUNTU_CODENAME}"
 
 echo "Instalando Docker versión: $DOCKER_VERSION"
 
-apt-get install -y \
+apt-get install -y --allow-change-held-packages \
   docker-ce=$DOCKER_VERSION \
   docker-ce-cli=$DOCKER_VERSION \
   containerd.io \
