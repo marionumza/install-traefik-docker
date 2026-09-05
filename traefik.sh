@@ -15,7 +15,7 @@ cat > docker-compose.yml << 'EOF'
 version: "3.8"
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v2.11
     container_name: traefik
     hostname: traefik
     restart: unless-stopped
