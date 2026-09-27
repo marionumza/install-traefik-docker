@@ -9,7 +9,7 @@ echo ""
 
 # 0. Preguntar por generación de clave RSA
 read -p "¿Deseas generar una clave SSH RSA nueva para este servidor? (s/n): " GENERAR_CLAVE
-if [[ "$GENERAR_CLAVE" == "s" || "$GENERAR_CLAVE" == "S" ]]; then
+if [ "$GENERAR_CLAVE" = "s" ] || [ "$GENERAR_CLAVE" = "S" ]; then
     # Extraer el email sugerido: usuario@hostname
     DEFAULT_EMAIL="$(whoami)@$(hostname)"
     read -p "Ingresa el email para la clave (Enter para usar: $DEFAULT_EMAIL): " SSH_EMAIL
