@@ -1,10 +1,15 @@
 #!/bin/bash
 # Instala autodoo en este servidor, o lo prepara para que pueda actualizarse.
 #
-# autodoo está en un repositorio privado. Este script crea una clave solo para autodoo, te la muestra para
-# que la cargues en GitHub y no sigue hasta comprobar que funciona. Esa clave es aparte de la del servidor
-# (~/.ssh/id_rsa), que queda libre para los repositorios de Odoo de cada cliente: GitHub no acepta la misma
-# clave en dos repositorios.
+# autodoo está en un repositorio privado. Primero se prueba con la clave del servidor (~/.ssh/id_rsa): si
+# ya entra (por ejemplo, porque está cargada en tu cuenta de GitHub), se usa esa y no hace falta nada más.
+# Si no entra (por ejemplo, porque es la deploy key del repositorio del cliente, y GitHub no acepta la misma
+# deploy key en dos repositorios), se crea una clave solo para autodoo, se te muestra para que la cargues en
+# GitHub y no se sigue hasta comprobar que funciona.
+#
+# PENDIENTE (seguridad): una clave del servidor cargada en la cuenta de GitHub puede leer y escribir en todos
+# los repositorios de esa cuenta. Más adelante, usar siempre deploy keys de solo lectura por repositorio (o un
+# usuario de GitHub solo para servidores) para que un servidor comprometido no llegue a los demás clientes.
 #
 # Se puede correr las veces que haga falta:
 #   - Servidor nuevo, con el Odoo ya instalado: crea la clave, clona autodoo en /opt/autodoo y lo enciende.
@@ -17,7 +22,9 @@ set -u
 
 GITHUB_REPO="marionumza/autodoo"
 HOST_ALIAS="github-autodoo"
-REPO_SSH="git@${HOST_ALIAS}:${GITHUB_REPO}.git"
+REPO_DIRECT="git@github.com:${GITHUB_REPO}.git"      # con la clave del servidor
+REPO_ALIAS="git@${HOST_ALIAS}:${GITHUB_REPO}.git"     # con la clave propia de autodoo
+REPO_SSH="$REPO_DIRECT"
 DEST="/opt/autodoo"
 OLD_DEST="/opt/autogestion"
 SSH_DIR="/root/.ssh"
@@ -43,34 +50,9 @@ if ! command -v git >/dev/null 2>&1 || ! command -v ssh-keygen >/dev/null 2>&1; 
     apt-get update -qq && apt-get install -y -qq git openssh-client
 fi
 
-# 1. Clave solo para autodoo (si ya existe, se usa la misma)
+# Huella de GitHub, para que git no pregunte
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
-if [ -f "$KEY" ]; then
-    echo "✅ La clave de autodoo ya existe en este servidor; se usa la misma."
-else
-    if ! ssh-keygen -t ed25519 -N "" -C "autodoo@$(hostname)" -f "$KEY" -q; then
-        echo "❌ No se pudo crear la clave de autodoo."
-        exit 1
-    fi
-    echo "✅ Clave de autodoo creada."
-fi
-
-# 2. Alias para que GitHub reciba esta clave solo cuando se trata de autodoo
-if [ ! -f "$SSH_CONFIG" ] || ! grep -qE "^Host[[:space:]]+${HOST_ALIAS}([[:space:]]|$)" "$SSH_CONFIG"; then
-    {
-        echo ""
-        echo "# autodoo: clave propia para su repositorio (la agregó autodoo.sh)"
-        echo "Host ${HOST_ALIAS}"
-        echo "    HostName github.com"
-        echo "    HostKeyAlias github.com"
-        echo "    User git"
-        echo "    IdentityFile ${KEY}"
-        echo "    IdentitiesOnly yes"
-    } >> "$SSH_CONFIG"
-fi
-chmod 600 "$SSH_CONFIG"
-# Huella de GitHub, para que git no pregunte
 if ! ssh-keygen -F github.com -f "${SSH_DIR}/known_hosts" >/dev/null 2>&1; then
     ssh-keyscan -t ed25519,rsa,ecdsa github.com >> "${SSH_DIR}/known_hosts" 2>/dev/null
 fi
@@ -80,52 +62,86 @@ has_access() {
         git ls-remote "$REPO_SSH" HEAD >/dev/null 2>&1
 }
 
-# 3. Que la cargue en GitHub; no se sigue sin acceso
+# 1. ¿La clave del servidor ya entra? Entonces no hace falta otra.
 if has_access; then
-    echo "✅ Este servidor ya tiene acceso al repositorio de autodoo."
+    echo "✅ La clave del servidor ya tiene acceso al repositorio de autodoo; se usa esa."
 else
-    echo ""
-    echo "🔑 Cargá esta clave en GitHub para que este servidor pueda bajar autodoo:"
-    line
-    cat "${KEY}.pub"
-    line
-    echo "  1. Abrí https://github.com/${GITHUB_REPO}/settings/keys/new"
-    echo "  2. Título: $(hostname)"
-    echo "  3. Pegá la clave de arriba (la línea entera)."
-    echo "  4. NO tildes «Allow write access»: autodoo solo necesita leer."
-    echo "  5. Tocá «Add key»."
-    echo ""
-    while true; do
-        ask RESP "Cuando la hayas agregado, presioná Enter para seguir (o escribí «c» para cancelar): "
-        case "$RESP" in
-            c|C|cancelar)
-                echo ""
-                echo "Cancelado. La clave quedó creada; cuando quieras, volvé a correr este script."
-                exit 1 ;;
-        esac
-        echo "Comprobando el acceso..."
-        if has_access; then
-            echo "✅ Listo: GitHub aceptó la clave."
-            break
+    REPO_SSH="$REPO_ALIAS"
+
+    # 2. Clave solo para autodoo (si ya existe, se usa la misma)
+    if [ -f "$KEY" ]; then
+        echo "La clave del servidor no entra a autodoo; se usa la clave propia de autodoo que ya estaba creada."
+    else
+        echo "La clave del servidor no entra a autodoo (suele pasar si es la deploy key del repositorio del cliente)."
+        if ! ssh-keygen -t ed25519 -N "" -C "autodoo@$(hostname)" -f "$KEY" -q; then
+            echo "❌ No se pudo crear la clave de autodoo."
+            exit 1
         fi
+        echo "✅ Clave propia de autodoo creada."
+    fi
+
+    # Alias para que GitHub reciba esta clave solo cuando se trata de autodoo
+    if [ ! -f "$SSH_CONFIG" ] || ! grep -qE "^Host[[:space:]]+${HOST_ALIAS}([[:space:]]|$)" "$SSH_CONFIG"; then
+        {
+            echo ""
+            echo "# autodoo: clave propia para su repositorio (la agregó autodoo.sh)"
+            echo "Host ${HOST_ALIAS}"
+            echo "    HostName github.com"
+            echo "    HostKeyAlias github.com"
+            echo "    User git"
+            echo "    IdentityFile ${KEY}"
+            echo "    IdentitiesOnly yes"
+        } >> "$SSH_CONFIG"
+    fi
+    chmod 600 "$SSH_CONFIG"
+
+    # 3. Que la cargue en GitHub; no se sigue sin acceso
+    if has_access; then
+        echo "✅ La clave propia de autodoo ya tiene acceso."
+    else
         echo ""
-        echo "⚠️  GitHub todavía no acepta la clave. Revisá que:"
-        echo "   - la cargaste en el repositorio ${GITHUB_REPO} (no en tu cuenta ni en otro repositorio);"
-        echo "   - copiaste la línea entera, desde «ssh-ed25519» hasta «autodoo@$(hostname)»;"
-        echo "   - tocaste «Add key» y GitHub la muestra en la lista."
-        echo "   La clave es esta:"
+        echo "🔑 Cargá esta clave en GitHub para que este servidor pueda bajar autodoo:"
         line
         cat "${KEY}.pub"
         line
-    done
+        echo "  1. Abrí https://github.com/${GITHUB_REPO}/settings/keys/new"
+        echo "  2. Título: $(hostname)"
+        echo "  3. Pegá la clave de arriba (la línea entera)."
+        echo "  4. NO tildes «Allow write access»: autodoo solo necesita leer."
+        echo "  5. Tocá «Add key»."
+        echo ""
+        while true; do
+            ask RESP "Cuando la hayas agregado, presioná Enter para seguir (o escribí «c» para cancelar): "
+            case "$RESP" in
+                c|C|cancelar)
+                    echo ""
+                    echo "Cancelado. La clave quedó creada; cuando quieras, volvé a correr este script."
+                    exit 1 ;;
+            esac
+            echo "Comprobando el acceso..."
+            if has_access; then
+                echo "✅ Listo: GitHub aceptó la clave."
+                break
+            fi
+            echo ""
+            echo "⚠️  GitHub todavía no acepta la clave. Revisá que:"
+            echo "   - la cargaste en el repositorio ${GITHUB_REPO} (no en tu cuenta ni en otro repositorio);"
+            echo "   - copiaste la línea entera, desde «ssh-ed25519» hasta «autodoo@$(hostname)»;"
+            echo "   - tocaste «Add key» y GitHub la muestra en la lista."
+            echo "   La clave es esta:"
+            line
+            cat "${KEY}.pub"
+            line
+        done
+    fi
 fi
 
-# Apunta una instalación existente a la clave nueva (sin tocar los contenedores)
+# Apunta una instalación existente a la dirección con acceso (sin tocar los contenedores)
 point_remote() {
     local dir="$1"
     git -C "$dir" remote set-url origin "$REPO_SSH"
     if git -C "$dir" fetch --quiet origin >/dev/null 2>&1; then
-        echo "✅ autodoo en ${dir} usa la clave nueva: «Actualizar» y el aviso de versiones vuelven a funcionar."
+        echo "✅ autodoo en ${dir} tiene acceso a GitHub: «Actualizar» y el aviso de versiones vuelven a funcionar."
     else
         echo "⚠️  Se cambió la dirección del repositorio en ${dir}, pero no se pudo traer de GitHub. Revisá la red."
     fi
