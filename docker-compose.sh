@@ -189,4 +189,18 @@ if [ -f ~/.ssh/id_rsa.pub ]; then
     echo "-------------------------------------------------------------------"
 fi
 
+# 9. autodoo: clave propia + acceso al repositorio (y la instalación, si el Odoo ya está)
+echo ""
+read -r -p "¿Preparar autodoo ahora? Te va a pedir que cargues una clave en GitHub (s/n): " PREP_AUTODOO < /dev/tty
+if [ "$PREP_AUTODOO" = "s" ] || [ "$PREP_AUTODOO" = "S" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+    if [ -f "$SCRIPT_DIR/autodoo.sh" ]; then
+        bash "$SCRIPT_DIR/autodoo.sh"
+    else
+        bash <(curl -fsSL https://raw.githubusercontent.com/marionumza/install-traefik-docker/main/autodoo.sh)
+    fi
+else
+    echo "Cuando quieras, corré: bash autodoo.sh"
+fi
+
 echo "Proceso finalizado correctamente."
