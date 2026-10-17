@@ -189,9 +189,9 @@ if [ -f ~/.ssh/id_rsa.pub ]; then
     echo "-------------------------------------------------------------------"
 fi
 
-# 9. autodoo: clave propia + acceso al repositorio (y la instalación, si el Odoo ya está)
+# 9. autodoo: bajarlo con la clave del servidor (comprueba el acceso antes)
 echo ""
-read -r -p "¿Preparar autodoo ahora? Te va a pedir que cargues una clave en GitHub (s/n): " PREP_AUTODOO < /dev/tty
+read -r -p "¿Bajar autodoo ahora? (s/n): " PREP_AUTODOO < /dev/tty
 if [ "$PREP_AUTODOO" = "s" ] || [ "$PREP_AUTODOO" = "S" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
     if [ -f "$SCRIPT_DIR/autodoo.sh" ]; then

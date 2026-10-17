@@ -4,41 +4,43 @@ Scripts para dejar listo un servidor nuevo (Ubuntu) de CRUMGES. Se corren como r
 
 ## Orden
 
-1. **`docker-compose.sh`**: Docker, Traefik, `/opt/odoo` y la clave SSH del servidor (`~/.ssh/id_rsa`, para los
-   repositorios de Odoo de cada cliente). Al final pregunta si querés preparar autodoo.
+1. **`docker-compose.sh`**: Docker, Traefik, `/opt/odoo` y la clave SSH del servidor (`~/.ssh/id_rsa`).
+   Al final pregunta si querés bajar autodoo.
 2. Instalá el Odoo (Doodba) del cliente.
-3. **`autodoo.sh`**: instala autodoo en `/opt/autodoo` y lo enciende.
+3. Encendé autodoo: `cd /opt/autodoo && python3 configure.py && docker compose up -d --build`.
 
 ## autodoo.sh
 
-autodoo está en un repositorio privado, así que el servidor necesita permiso para bajarlo y actualizarse.
+Baja autodoo en `/opt/autodoo` con la clave del servidor (`~/.ssh/id_rsa`). autodoo está en un repositorio
+privado, así que esa clave tiene que estar cargada en la cuenta de GitHub con acceso
+(perfil › Settings › SSH and GPG keys).
 
-1. Primero prueba con la clave del servidor (`~/.ssh/id_rsa`). Si ya entra (por ejemplo, porque está cargada en
-   tu cuenta de GitHub), usa esa y sigue.
-2. Si no entra (por ejemplo, porque es la deploy key del repositorio del cliente: GitHub no acepta la misma deploy
-   key en dos repositorios), crea una clave **solo para autodoo** (`~/.ssh/id_ed25519_autodoo`), te la muestra y
-   espera a que la cargues en `marionumza/autodoo` › Settings › Deploy keys, **sin** «Allow write access».
-   Comprueba el acceso antes de seguir: si GitHub todavía no la acepta, te lo dice y vuelve a esperar, o cancelás.
+Antes de bajar nada, comprueba que GitHub acepta la clave. Si no la acepta, te la muestra, te dice dónde
+cargarla y espera; si sigue sin entrar, te dice qué revisar y vuelve a esperar, o cancelás con «c».
 
-Se puede correr las veces que haga falta:
-
-| Situación del servidor | Qué hace |
-|---|---|
-| Sin Odoo todavía | Deja lista la clave. Volvé a correrlo cuando el Odoo esté andando. |
-| Con Odoo, sin autodoo | Clona autodoo, arma el `.env` (`configure.py`), pide la contraseña del correo de autodoo (opcional) y lo enciende. |
-| Con autodoo en `/opt/autodoo` | Apunta autodoo a la clave que tiene acceso, para que «Actualizar» funcione. No apaga ni reinicia nada. |
-| Con la carpeta vieja `/opt/autogestion` | Lo mismo, y ofrece pasarla a `/opt/autodoo` (apaga y vuelve a encender). |
+Si autodoo ya estaba en `/opt/autodoo`, solo lo apunta a GitHub con esa clave para que «Actualizar» funcione.
+No apaga ni reinicia nada.
 
 ```bash
 sudo bash autodoo.sh
 ```
 
-## Pendiente: seguridad de las claves
+## Próxima etapa: «autodoo Central»
 
-Una clave del servidor cargada en la cuenta de GitHub puede leer **y escribir** en todos los repositorios de esa
-cuenta, incluidos los de los demás clientes. Más adelante: deploy keys de solo lectura por repositorio (o un
-usuario de GitHub solo para servidores, con permiso de lectura en `autodoo`), para que un servidor comprometido
-no llegue a los demás.
+Ideas para más adelante (no necesariamente la etapa inmediata):
+
+- **autodoo Central:** una aplicación de CRUMGES que gobierne a todos los autodoo: despliegues, estado de cada
+  servidor, versiones y gestión de claves. Cada servidor sigue teniendo su propio autodoo.
+- **Asistente gráfico de instalación:** el usuario corre un solo comando de SSH en su computadora (Windows, Mac o
+  Linux), que abre un túnel, y sigue el resto en su navegador: Docker y Traefik, dominio (que apunte al servidor),
+  claves con «Copiar» y «Abrir GitHub», y autodoo. Más adelante, crear el Odoo desde el propio autodoo.
+  Para eso autodoo tiene que poder instalarse sin Odoo (dominio cargado a mano) y arrancar sin ambientes.
+- **Seguridad de las claves:** una clave cargada en la cuenta de GitHub puede leer **y escribir** en todos los
+  repositorios de esa cuenta, incluidos los de los demás clientes. Pasar a deploy keys de solo lectura por
+  repositorio (o un usuario de GitHub solo para servidores) para que un servidor comprometido no llegue a los demás.
+- **Repartir autodoo** cuando lo instale el cliente: no puede cargar claves en el repositorio privado de
+  CRUMGES. Opciones: que CRUMGES cargue la clave, imagen de Docker ya armada en un registro privado, o repositorio
+  público.
 
 ## traefik.sh
 
